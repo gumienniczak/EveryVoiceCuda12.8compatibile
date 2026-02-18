@@ -30,7 +30,7 @@ from rich.panel import Panel
 from rich.style import Style
 from tabulate import tabulate
 from torchaudio.functional import resample
-from torchaudio.sox_effects import apply_effects_tensor
+# from torchaudio.sox_effects import apply_effects_tensor
 from tqdm import tqdm
 
 from everyvoice.config.type_definitions import (
@@ -208,11 +208,24 @@ class Preprocessor:
                     logger.error(WINDOWS_WARNING)
                     sys.exit(1)
             else:
-                audio, sr = apply_effects_tensor(
-                    audio,
-                    sr,
-                    sox_effects,
-                )
+                for effect in sox_effects:
+                    name = effect[0]
+
+                    if name == 'channels':
+                        target_channels = int(effect[1])
+                        if target_channels == 1 and audio.shape[0] > 1:
+                            # Convert stereo → mono
+                            audio = torch.mean(audio, dim=0, keepdim=True)
+                    
+                    elif name == 'norm':
+                        
+                        target_db = float(effect[1])
+
+                        peak = audio.abs().max()
+
+                        if peak > 0:
+                            target_linear = 10 ** (target_db / 20)
+                            audio = audio / peak * target_linear
 
         if resample_rate is not None and resample_rate != sr:
             audio = resample(audio, sr, resample_rate)
